@@ -4,6 +4,7 @@ datasets/
 
 # Visual studio stuff
 .vscode/
+.idea/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -20,9 +20,13 @@ if __name__ == "__main__":
     parser.add_argument("-t", "--task", required=True, type=str, choices=["SelectP", "MinSpan"],
                         help="Which task should be generated file")
     parser.add_argument("-l", "--limit", required=False, type=int, default=None,
-                        help="Is this a train or dev dataset?")
+                        help="Limit results")
     parser.add_argument("--filter", action="store_true",
                         help="Filter out sentences that does not have a positive answer.")
+    #parser.add_argument("-s", "--split", required=False, type=int, default=1,
+    #                    help="Split output in n files")
+    parser.add_argument("--threads", required=False, type=int, default=1,
+                        help="Split output in n files")
 
     args = parser.parse_args()
 
@@ -32,16 +36,18 @@ if __name__ == "__main__":
     force = args.force
     task = args.task
     _filter = args.filter
+    threads = args.threads
     limit = args.limit if args.limit is not None else 0
 
     # checks...
     assert os.path.isfile(input_file), f"{input_file} does not exist"
 
     # create output folder if it does not exists
-    if os.path.isfile(output_file):
+    if os.path.isdir(output_file):
         assert force, f"file {output_file} does already exists, use -f to force overwrite"
+        #import shutil
+        #shutil.rmtree(output_folder)
         os.remove(output_file)
-
 
     # sort annotations such that the best is first
     # the best means that the sentences appears before in the
@@ -58,7 +64,8 @@ if __name__ == "__main__":
                 best = annotation
         return annotation
     """
-    language_dict = dict()
+    with open("lang_dict.json") as f:
+        language_dict = json.loads(f.read())
 
     # in case we are doing training lets also put the labels
     def func(entry):
@@ -106,6 +113,8 @@ if __name__ == "__main__":
             out_queue.put(result)
             in_queue.task_done()
 
+    # take trace of how many rows per language are written to output_file
+    language_count = dict()
     # open the output csv
     with open(output_file, mode="w") as out_file:
         o_writer = csv.writer(out_file, delimiter='\t', quotechar='"', quoting=csv.QUOTE_ALL)
@@ -131,8 +140,17 @@ if __name__ == "__main__":
 
             print("Starting to write results to disk")
             while not results.empty():
-                o_writer.writerows(results.get())
+                tmp = results.get()
+                for row in tmp:
+                    if row[1] not in language_count:
+                        language_count[row[1]] = 1
+                    else:
+                        language_count[row[1]] += 1
+                o_writer.writerows(tmp)
        
+    print("Entries per lang")
+    for k, v in language_count.items():
+        print(f"Lang {k}: {v} entries")
 
     print("Done!")
 
